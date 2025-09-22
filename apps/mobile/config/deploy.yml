@@ -1,0 +1,62 @@
+service: touchline
+image: ghcr.io/YOUR_GH_USERNAME/touchline
+servers:
+  - 192.0.2.10
+  - 192.0.2.11
+proxy:
+  app_port: 3000
+  host: touchline.example.com
+env:
+  clear:
+    RAILS_ENV: production
+    RACK_ENV: production
+    DATABASE_URL: postgres://touchline:CHANGE_ME@127.0.0.1:5432/touchline_production
+    REDIS_URL: redis://127.0.0.1:6379/0
+    AWS_REGION: us-east-1
+    S3_BUCKET: your-bucket
+    STRIPE_LIVE_MODE: "false"
+  secret:
+    - SECRET_KEY_BASE
+    - AWS_ACCESS_KEY_ID
+    - AWS_SECRET_ACCESS_KEY
+    - STRIPE_SECRET_KEY
+    - JWT_SECRET
+registry:
+  server: ghcr.io
+  username: YOUR_GH_USERNAME
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+builder:
+  context: .
+  dockerfile: apps/backend/Dockerfile
+roles:
+  web:
+    hosts: [192.0.2.10]
+    cmd: bin/rails server -b 0.0.0.0 -p 3000
+    port: 3000
+  worker:
+    hosts: [192.0.2.11]
+    cmd: bundle exec sidekiq -c 5
+accessories:
+  redis:
+    image: redis:7
+    host: 192.0.2.11
+    port: 6379
+    volumes: [/var/lib/touchline/redis:/data]
+  postgres:
+    image: postgres:15
+    host: 192.0.2.10
+    port: 5432
+    env:
+      clear:
+        POSTGRES_DB: touchline_production
+        POSTGRES_USER: touchline
+      secret:
+        - POSTGRES_PASSWORD
+    volumes: [/var/lib/touchline/postgres:/var/lib/postgresql/data]
+healthcheck:
+  path: /up
+  port: 3000
+  interval: 5s
+  timeout: 3s
+  retries: 12
